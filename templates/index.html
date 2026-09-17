@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>فحص تسريبات حسابك</title>
+<style>
+body{font-family:Tahoma,sans-serif;background:#0d1117;color:#e6edf3;text-align:center;padding:40px}
+input{padding:12px;width:320px;border-radius:8px;border:1px solid #30363d;background:#161b22;color:#fff}
+button{padding:12px 24px;border-radius:8px;border:0;background:#238636;color:#fff;cursor:pointer;margin:10px}
+.card{background:#161b22;border-radius:10px;padding:16px;margin:10px auto;max-width:600px;text-align:right}
+.bad{border-right:4px solid #f85149}.good{border-right:4px solid #3fb950}
+.advice{color:#d29922;text-align:right;max-width:600px;margin:0 auto}
+</style>
+</head>
+<body>
+<h1>🛡️ هل حسابك معرّض للتسريبات؟</h1>
+<p>أدخل بريدك الإلكتروني لترى أي المواقع سُرّبت بياناتك — لا نعرض ولا نخزّن أي كلمات سر</p>
+
+<input id="email" placeholder="your@email.com">
+<br><button onclick="checkEmail()">فحص البريد</button>
+
+<div style="margin-top:30px">
+  <input id="pass" type="password" placeholder="اختبر قوة كلمة سر (لا تُرسل كاملة أبداً)">
+  <br><button onclick="checkPass()">هل كلمة السر معروضة؟</button>
+</div>
+
+<div id="out"></div>
+
+<script>
+async function post(url, data){
+  const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
+  return r.json();
+}
+async function checkEmail(){
+  const email = document.getElementById("email").value.trim();
+  const out = document.getElementById("out");
+  out.innerHTML = "<p>⏳ جاري الفحص...</p>";
+  const d = await post("/api/check/email", {email});
+  if(d.error){ out.innerHTML = `<div class="card bad">${d.error}</div>`; return; }
+  let html = d.breach_count === 0
+    ? `<div class="card good">✅ بريدك غير موجود في أي تسريب معروف</div>`
+    : `<div class="card bad">⚠️ تم العثور على بريدك في ${d.breach_count} تسريب ${d.password_exposed?"— منها تسريبات تتضمن كلمات سر! غيّرها فوراً":""}</div>`;
+  d.breaches.forEach(b=>{
+    html += `<div class="card"><b>${b.site}</b> (${b.date})<br>
+             البيانات المسربة: ${b.data_leaked.join(", ")}</div>`;
+  });
+  if(d.advice) html += `<div class="advice"><h3>نصائح الحماية:</h3><ul>${d.advice.map(a=>`<li>${a}</li>`).join("")}</ul></div>`;
+  out.innerHTML = html;
+}
+async function checkPass(){
+  const password = document.getElementById("pass").value;
+  const d = await post("/api/check/password", {password});
+  document.getElementById("pass").value = "";
+  document.getElementById("out").innerHTML = d.safe
+    ? `<div class="card good">✅ كلمة السر غير موجودة في تسريبات معروفة</div>`
+    : `<div class="card bad">❌ كلمة السر هذه ظهرت ${d.exposed_times} مرة في تسريبات — لا تستخدمها أبداً</div>`;
+}
+</script>
+</body>
+</html>
